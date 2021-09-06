@@ -1,22 +1,22 @@
-# defaults
+# shellcheck shell=bash
+#
 # Bash command line completion for defaults
 #
-# Created by Jonathon Mah on 2006-11-08.
+# Version 1.0 created by Jonathon Mah on 2006-11-08.
 # Copyright 2006 Playhaus. All rights reserved.
 #
-# Version 1.0 (2006-11-08)
+
 
 
 _defaults_domains()
 {
-	local cur
-	COMPREPLY=()
-	cur=${COMP_WORDS[COMP_CWORD]}
-
-	local domains=$( defaults domains | sed -e 's/, /:/g' | tr : '\n' | sed -e 's/ /\\ /g' | grep -i "^$cur" )
 	local IFS=$'\n'
-	COMPREPLY=( $domains )
-	if [[ $( echo '-app' | grep "^$cur" ) ]]
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+	COMPREPLY=()
+
+	local domains=( $( defaults domains | sed -e 's/, /:/g' | tr : '\n' | grep -i "^$cur" ) )
+	COMPREPLY=( "${domains[@]}" )
+	if echo '-app' | grep -q "^$cur"
 	then
 		COMPREPLY[${#COMPREPLY[@]}]="-app"
 	fi
@@ -27,7 +27,8 @@ _defaults_domains()
 
 _defaults()
 {
-	local cur prev host_opts cmds cmd domain keys key_index
+	local IFS=$'\n'
+	local cur prev host_opts cmds cmd domain keys key_index candidates
 	cur="${COMP_WORDS[COMP_CWORD]}"
 	prev="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -36,27 +37,31 @@ _defaults()
 
 	if [[ $COMP_CWORD -eq 1 ]]
 	then
-		COMPREPLY=( $( compgen -W "$host_opts $cmds" -- $cur ) )
+		candidates=( "${cmds// /$IFS}" "${host_opts// /$IFS}" )
+		COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
 		return 0
 	elif [[ $COMP_CWORD -eq 2 ]]
 	then
 		if [[ "$prev" == "-currentHost" ]]
 		then
-			COMPREPLY=( $( compgen -W "$cmds" -- $cur ) )
-			return 0
+			candidates=( "${cmds// /$IFS}" )
+			COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
 		elif [[ "$prev" == "-host" ]]
 		then
 			_known_hosts -a
-			return 0
-		else
+		elif [[ "$prev" == ${cmds// /|} ]]
+		then
 			# TODO: not correct for domains, find, help
 			_defaults_domains
-			return 0
+		else
+			return 1 # verb is not recognized
 		fi
+		return 0
 	elif [[ $COMP_CWORD -eq 3 ]]
 	then
-		if [[ ${COMP_WORDS[1]} == "-host" ]]
+		if [[ ${COMP_WORDS[1]} == "-currentHost" ]]
 		then
+			#TODO: needs work...
 			_defaults_domains
 			return 0
 		fi
@@ -65,7 +70,7 @@ _defaults()
 
 	# Both a domain and command have been specified
 
-	if [[ ${COMP_WORDS[1]} =~ [${cmds// /|}] ]]
+	if [[ ${COMP_WORDS[1]} =~ ${cmds// /|} ]]
 	then
 		cmd="${COMP_WORDS[1]}"
 		domain="${COMP_WORDS[2]}"
@@ -80,7 +85,7 @@ _defaults()
 			domain="-app ${COMP_WORDS[3]}"
 			key_index=4
 		fi
-	elif [[ ${COMP_WORDS[2]} == "-currentHost" && ${COMP_WORDS[2]} == [${cmds// /|}] ]]
+	elif [[ ${COMP_WORDS[1]} == "-currentHost" && ${COMP_WORDS[2]} =~ ${cmds// /|} ]]
 	then
 		cmd="${COMP_WORDS[2]}"
 		domain="${COMP_WORDS[3]}"
@@ -95,7 +100,8 @@ _defaults()
 			domain="-app ${COMP_WORDS[4]}"
 			key_index=5
 		fi
-	elif [[ ${COMP_WORDS[3]} == "-host" && ${COMP_WORDS[3]} == [${cmds// /|}] ]]; then
+	elif [[ ${COMP_WORDS[1]} == "-host" && ${COMP_WORDS[3]} =~ ${cmds// /|} ]]
+	then
 		cmd="${COMP_WORDS[3]}"
 		domain="${COMP_WORDS[4]}"
 		key_index=5
@@ -111,20 +117,24 @@ _defaults()
 		fi
 	fi
 
-	keys="$( defaults read "$domain" 2>/dev/null | sed -n -e '/^    [^}) ]/p' | sed -e 's/^    \([^" ]\{1,\}\) = .*$/\1/g' -e 's/^    "\([^"]\{1,\}\)" = .*$/\1/g' | sed -e 's/ /\\ /g' )"
+	keys=( $( defaults read "$domain" 2>/dev/null | sed -n -e '/^    [^}) ]/p' | sed -e 's/^    \([^" ]\{1,\}\) = .*$/\1/g' -e 's/^    "\([^"]\{1,\}\)" = .*$/\1/g' ) )
 
 	case $cmd in
 	read|read-type)
 		# Complete key
-		local IFS=$'\n'
-		COMPREPLY=( $( echo "$keys" | grep -i "^${cur//\\/\\\\}" ) )
+		if candidates=( $( compgen -W "${keys[*]:-}" | grep -i "^${cur}" ) )
+		then
+			COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
+		fi
 		;;
 	write)
 		if [[ $key_index -eq $COMP_CWORD ]]
 		then
 			# Complete key
-			local IFS=$'\n'
-			COMPREPLY=( $( echo "$keys" | grep -i "^${cur//\\/\\\\}" ) )
+			if candidates=( $( compgen -W "${keys[*]:-}" | grep -i "^${cur}" ) )
+			then
+				COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
+			fi
 		elif [[ $((key_index+1)) -eq $COMP_CWORD ]]
 		then
 			# Complete value type
@@ -148,16 +158,20 @@ _defaults()
 		if [[ $key_index -eq $COMP_CWORD || $((key_index+1)) -eq $COMP_CWORD ]]
 	   then
 			# Complete source and destination keys
-			local IFS=$'\n'
-			COMPREPLY=( $( echo "$keys" | grep -i "^${cur//\\/\\\\}" ) )
+			if candidates=( $( compgen -W "${keys[*]:-}" | grep -i "^${cur}" ) )
+			then
+				COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
+			fi
 		fi
 		;;
 	delete)
 		if [[ $key_index -eq $COMP_CWORD ]]
 		then
 			# Complete key
-			local IFS=$'\n'
-			COMPREPLY=( $( echo "$keys" | grep -i "^${cur//\\/\\\\}" ) )
+			if candidates=( $( compgen -W "${keys[*]:-}" | grep -i "^${cur}" ) )
+			then
+				COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
+			fi
 		fi
 		;;
 	esac
