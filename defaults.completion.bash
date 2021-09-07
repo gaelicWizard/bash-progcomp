@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2207
 #
 # Bash command line completion for defaults
 #
