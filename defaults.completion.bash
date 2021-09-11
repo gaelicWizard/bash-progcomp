@@ -6,7 +6,7 @@
 # Copyright 2006 Playhaus. All rights reserved.
 #
 
-
+shopt -s extglob
 
 _defaults_domains()
 {
@@ -49,7 +49,7 @@ _defaults()
 		elif [[ "$prev" == "-host" ]]
 		then
 			_known_hosts -a
-		elif [[ "$prev" == ${cmds// /|} ]]
+		elif [[ "$prev" == @(${cmds// /|}) ]]
 		then
 			# TODO: not correct for domains, find, help
 			_defaults_domains
@@ -70,7 +70,7 @@ _defaults()
 
 	# Both a domain and command have been specified
 
-	if [[ ${COMP_WORDS[1]} =~ ${cmds// /|} ]]
+	if [[ ${COMP_WORDS[1]} == @(${cmds// /|}) ]]
 	then
 		cmd="${COMP_WORDS[1]}"
 		domain="${COMP_WORDS[2]}"
@@ -85,7 +85,7 @@ _defaults()
 			domain="-app ${COMP_WORDS[3]}"
 			key_index=4
 		fi
-	elif [[ ${COMP_WORDS[1]} == "-currentHost" && ${COMP_WORDS[2]} =~ ${cmds// /|} ]]
+	elif [[ ${COMP_WORDS[1]} == "-currentHost" && ${COMP_WORDS[2]} == @(${cmds// /|}) ]]
 	then
 		cmd="${COMP_WORDS[2]}"
 		domain="${COMP_WORDS[3]}"
@@ -100,7 +100,7 @@ _defaults()
 			domain="-app ${COMP_WORDS[4]}"
 			key_index=5
 		fi
-	elif [[ ${COMP_WORDS[1]} == "-host" && ${COMP_WORDS[3]} =~ ${cmds// /|} ]]
+	elif [[ ${COMP_WORDS[1]} == "-host" && ${COMP_WORDS[3]} == @(${cmds// /|}) ]]
 	then
 		cmd="${COMP_WORDS[3]}"
 		domain="${COMP_WORDS[4]}"
