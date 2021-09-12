@@ -15,8 +15,9 @@ _defaults_domains()
 	local cur="${COMP_WORDS[COMP_CWORD]}"
 	COMPREPLY=()
 
-	local domains=( $( defaults domains | sed -e 's/, /:/g' | tr : '\n' | grep -i "^$cur" ) )
-	COMPREPLY=( "${domains[@]}" )
+	local domains="$( defaults domains | sed -e 's/, /^/g' | tr '^' '\n' )"
+	local candidates=( $( compgen -W "${domains}" | grep -i "^${cur}" ) )
+	COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
 	if echo '-app' | grep -q "^$cur"
 	then
 		COMPREPLY[${#COMPREPLY[@]}]="-app"
