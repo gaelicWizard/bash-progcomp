@@ -68,9 +68,9 @@ function __check_completion () {
   assert_line -n 0 "$(_known_hosts -a)"
 }
 
-@test "completion defaults: -host teh_host_name - show verbs" {
+@test "completion defaults: -host some_computer_name - show verbs" {
   skip "not implemented"
-  run __check_completion 'defaults -host teh_host_name '
+  run __check_completion 'defaults -host some_computer_name '
   assert_line -n 0 'delete domains export find help import read read-type rename write'
 }
 
