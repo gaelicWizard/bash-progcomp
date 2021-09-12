@@ -24,6 +24,9 @@ function _defaults_domains()
 	if echo '-app' | grep -q "^$cur"
 	then
 		COMPREPLY[${#COMPREPLY[@]}]="-app"
+	elif echo '-g' | grep -q "^$cur"
+	then
+		COMPREPLY[${#COMPREPLY[@]}]="-g"
 	fi
 
 	return 0
