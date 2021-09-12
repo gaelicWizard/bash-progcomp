@@ -4,27 +4,63 @@
 # Bash command line completion for defaults
 #
 # Version 1.0 created by Jonathon Mah on 2006-11-08.
-# Copyright 2006 Playhaus. All rights reserved.
+# Version 2.0 written by John Pell on 2021-09-11.
 #
 
-shopt -s extglob
+function matchpattern()
+{
+	local PATTERN=${2:?$FUNCNAME: a pattern is required}
+	local SEP=${3:-|}
+	[[ -z "${PATTERN##*${SEP}${1}${SEP}*}" ]]
+}
+
+function _defaults_verbs()
+{
+	local IFS=$'\n' # Treat only newlines as delimiters in string operations.
+	local LC_CTYPE='C' # Do not consider character set in string operations.
+	local LC_COLLATE='C' # Do not consider character set in pattern matching.
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+	local prev="${COMP_WORDS[COMP_CWORD-1]}"
+	COMPREPLY=()
+
+	case $COMP_CWORD in
+	1)
+		candidates=( "${cmds// /$IFS}" "${host_opts[@]}" )
+		;;
+	2|3)
+		candidates=( "${cmds// /$IFS}" )
+		;;
+	*)
+		return 1
+		;;
+	esac
+
+	COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
+	return 0
+}
 
 function _defaults_domains()
 {
 	local IFS=$'\n' # Treat only newlines as delimiters in string operations.
 	local LC_CTYPE='C' # Do not consider character set in string operations.
+	local LC_COLLATE='C' # Do not consider character set in pattern matching.
 	local cur="${COMP_WORDS[COMP_CWORD]}"
+	local prev="${COMP_WORDS[COMP_CWORD-1]}"
 	COMPREPLY=()
 
-	#local domains="$( defaults domains )"
-	#local candidates=( $( compgen -W "${domains//, /$'\n'}" | grep -i "^${cur}" ) )
-	local domains="$( defaults domains | sed -e 's/, /^/g' | tr '^' '\n' )"
-	local candidates=( $( compgen -W "${domains}" | grep -i "^${cur}" ) )
+	if [[ "$BASH_VERSINFO" -ge 4 ]]
+	then # Exponential performance issue on strings greater than about 10k.
+		local domains="$( defaults domains )"
+		local candidates=( $( compgen -W "${domains//, /$IFS}" | grep -i "^${cur}" ) )
+	else
+		local domains="$( defaults domains | sed -e 's/, /^/g' | tr '^' '\n' )"
+		local candidates=( $( compgen -W "${domains}" | grep -i "^${cur}" ) )
+	fi
 	COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
-	if echo '-app' | grep -q "^$cur"
+	if grep -q "^$cur" <<< '-app'
 	then
 		COMPREPLY[${#COMPREPLY[@]}]="-app"
-	elif echo '-g' | grep -q "^$cur"
+	elif grep -q "^$cur" <<< '-g'
 	then
 		COMPREPLY[${#COMPREPLY[@]}]="-g"
 	fi
@@ -35,95 +71,130 @@ function _defaults_domains()
 
 function _defaults()
 {
-	local IFS=$'\n'
-	local cur prev host_opts cmds cmd domain keys key_index candidates
-	cur="${COMP_WORDS[COMP_CWORD]}"
-	prev="${COMP_WORDS[COMP_CWORD-1]}"
+	local IFS=$'\n' # Treat only newlines as delimiters in string operations.
+	local LC_CTYPE='C' # Do not consider character set in string operations.
+	local LC_COLLATE='C' # Do not consider character set in pattern matching.
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+	local prev="${COMP_WORDS[COMP_CWORD-1]}"
+	COMPREPLY=()
+
+	local host_opts cmds cmd domain keys key_index candidates verbs value_types
 
 	host_opts=('-currentHost' '-host')
-	cmds='delete domains export find help import read read-type rename write'
+	cmds=' delete domains export find help import read read-type rename write '
+	value_types=('-string' '-data' '-integer' '-float' '-boolean' '-date' '-array' '-array-add' '-dict' '-dict-add')
 
-	if [[ $COMP_CWORD -eq 1 ]]
-	then
-		candidates=( "${cmds// /$IFS}" "${host_opts[@]}" )
-		COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
-		return 0
-	elif [[ $COMP_CWORD -eq 2 ]]
-	then
-		if [[ "$prev" == "-currentHost" ]]
-		then
-			candidates=( "${cmds// /$IFS}" )
-			COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
-		elif [[ "$prev" == "-host" ]]
-		then
+
+	case $COMP_CWORD in
+	1)
+		_defaults_verbs
+		return "$?"
+		;;
+	2)
+		case $prev in
+		"-currentHost")
+			_defaults_verbs
+			;;
+		"-host")
 			_known_hosts -a
-		elif [[ "$prev" == @(${cmds// /|}) ]]
-		then
-			# TODO: not correct for domains, find, help
+			;;
+		*)
+			if matchpattern "$prev" "${cmds// /|}"
+			then
+				# TODO: not correct for verbs: domains, find, help
+				_defaults_domains
+			else
+				return 1 # verb is not recognized
+			fi
+			;;
+		esac
+		return "$?"
+		;;
+	3)
+		case ${COMP_WORDS[1]} in
+		"-currentHost")
 			_defaults_domains
-		else
-			return 1 # verb is not recognized
-		fi
-		return 0
-	elif [[ $COMP_CWORD -eq 3 ]]
-	then
-		if [[ ${COMP_WORDS[1]} == "-currentHost" ]]
-		then
-			#TODO: needs work...
-			_defaults_domains
-			return 0
-		fi
-		#TODO: more possible completions here
-	fi
+			return "$?"
+			;;
+		"-host")
+			_defaults_verbs
+			return "$?"
+			;;
+		esac
+		;;
+	4)
+		case ${COMP_WORDS[1]} in
+		"-host")
+			if matchpattern "$prev" "${cmds// /|}"
+			then
+				# TODO: not correct for verbs: domains, find, help
+				_defaults_domains
+			else
+				return 1 # verb is not recognized
+			fi
+		esac
+		;;
+	esac
 
 	# Both a domain and command have been specified
 
-	if [[ ${COMP_WORDS[1]} == @(${cmds// /|}) ]]
-	then
-		cmd="${COMP_WORDS[1]}"
-		domain="${COMP_WORDS[2]}"
-		key_index=3
-		if [[ "$domain" == "-app" ]]
+	case ${COMP_WORDS[1]} in
+	"-currentHost")
+		if matchpattern "${COMP_WORDS[2]}" "${cmds// /|}"
 		then
-			if [[ $COMP_CWORD -eq 3 ]];
-			then
-				# Completing application name. Can't help here, sorry
-				return 0
-			fi
-			domain="-app ${COMP_WORDS[3]}"
+			cmd="${COMP_WORDS[2]}"
+			domain="${COMP_WORDS[3]}"
 			key_index=4
-		fi
-	elif [[ ${COMP_WORDS[1]} == "-currentHost" && ${COMP_WORDS[2]} == @(${cmds// /|}) ]]
-	then
-		cmd="${COMP_WORDS[2]}"
-		domain="${COMP_WORDS[3]}"
-		key_index=4
-		if [[ "$domain" == "-app" ]]
-		then
-			if [[ $COMP_CWORD -eq 4 ]]
+			if [[ "$domain" == "-app" ]]
 			then
-				# Completing application name. Can't help here, sorry
-				return 0
+				if [[ $COMP_CWORD -eq 4 ]]
+				then
+					# Completing application name. Can't help here, sorry
+					return 0
+				fi
+				domain="-app ${COMP_WORDS[4]}"
+				key_index=5
 			fi
-			domain="-app ${COMP_WORDS[4]}"
+		fi
+		;;
+	"-host")
+		if matchpattern "${COMP_WORDS[3]}" "${cmds// /|}"
+		then
+			cmd="${COMP_WORDS[3]}"
+			domain="${COMP_WORDS[4]}"
 			key_index=5
-		fi
-	elif [[ ${COMP_WORDS[1]} == "-host" && ${COMP_WORDS[3]} == @(${cmds// /|}) ]]
-	then
-		cmd="${COMP_WORDS[3]}"
-		domain="${COMP_WORDS[4]}"
-		key_index=5
-		if [[ "$domain" == "-app" ]]
-		then
-			if [[ $COMP_CWORD -eq 5 ]]
+			if [[ "$domain" == "-app" ]]
 			then
-				# Completing application name. Can't help here, sorry
-				return 0
+				if [[ $COMP_CWORD -eq 5 ]]
+				then
+					# Completing application name. Can't help here, sorry
+					return 0
+				fi
+				domain="-app ${COMP_WORDS[5]}"
+				key_index=6
 			fi
-			domain="-app ${COMP_WORDS[5]}"
-			key_index=6
 		fi
-	fi
+		;;
+	*)
+		if matchpattern "${COMP_WORDS[1]}" "${cmds// /|}"
+		then
+			cmd="${COMP_WORDS[1]}"
+			domain="${COMP_WORDS[2]}"
+			key_index=3
+			if [[ "$domain" == "-app" ]]
+			then
+				if [[ $COMP_CWORD -eq 3 ]];
+				then
+					# Completing application name. Can't help here, sorry
+					return 0
+				fi
+				domain="-app ${COMP_WORDS[3]}"
+				key_index=4
+			fi
+		fi
+		;;
+
+	esac
 
 	keys=( $( defaults read "$domain" 2>/dev/null | sed -n -e '/^    [^}) ]/p' | sed -e 's/^    \([^" ]\{1,\}\) = .*$/\1/g' -e 's/^    "\([^"]\{1,\}\)" = .*$/\1/g' ) )
 
@@ -146,18 +217,16 @@ function _defaults()
 		elif [[ $((key_index+1)) -eq $COMP_CWORD ]]
 		then
 			# Complete value type
-			local value_types='-string -data -integer -float -boolean -date -array -array-add -dict -dict-add'
 			local cur_type="$( defaults read-type "$domain" "${COMP_WORDS[key_index]}" 2>/dev/null | sed -e 's/^Type is \(.*\)/-\1/' -e's/dictionary/dict/' | grep "^$cur" )"
 			if [[ $cur_type ]]
 			then
 				COMPREPLY=( "$cur_type" )
 			else
-				COMPREPLY=( $( compgen -W "$value_types" -- "$cur" ) )
+				COMPREPLY=( $( compgen -W "${value_types[*]}" -- "$cur" ) )
 			fi
 		elif [[ $((key_index+2)) -eq $COMP_CWORD ]]
 		then
 			# Complete value
-			# Unfortunately ${COMP_WORDS[key_index]} fails on keys with spaces
 			COMPREPLY=( $( defaults read "$domain" "${COMP_WORDS[key_index]}" 2>/dev/null | grep -i "^${cur//\\/\\\\}" ) )
 		fi
 		;;
@@ -192,6 +261,7 @@ complete -F _defaults -o default defaults
 # This file is licensed under the BSD license, as follows:
 #
 # Copyright (c) 2006, Playhaus
+# Copyright (c) 2021, gaelicWizard.LLC
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -202,7 +272,7 @@ complete -F _defaults -o default defaults
 # * Redistributions in binary form must reproduce the above copyright notice,
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
-# * Neither the name of the Playhaus nor the names of its contributors may be
+# * Neither the names of the authors nor the names of its contributors may be
 #   used to endorse or promote products derived from this software without
 #   specific prior written permission.
 #

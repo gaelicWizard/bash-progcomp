@@ -69,7 +69,6 @@ function __check_completion () {
 }
 
 @test "completion defaults: -host some_computer_name - show verbs" {
-  skip "not implemented"
   run __check_completion 'defaults -host some_computer_name '
   assert_line -n 0 'delete domains export find help import read read-type rename write'
 }
