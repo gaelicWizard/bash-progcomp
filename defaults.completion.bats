@@ -88,3 +88,23 @@ function __check_completion () {
   run __check_completion 'defaults read NSG'
   assert_line -n 0 "NSGlobalDomain"
 }
+
+@test "completion defaults: read bash* - show matching domains" {
+  run __check_completion 'defaults read bash'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: read BASH* - show matching domains" {
+  run __check_completion 'defaults read BASH'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: read bash* - show matching domains (with spaces)" {
+  run __check_completion 'defaults read bash\ i'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: read BASH* - show matching domains (with spaces)" {
+  run __check_completion 'defaults read BASH\ I'
+  assert_line -n 0 "Bash\ It"
+}
