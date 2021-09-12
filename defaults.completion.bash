@@ -9,12 +9,15 @@
 
 shopt -s extglob
 
-_defaults_domains()
+function _defaults_domains()
 {
-	local IFS=$'\n'
+	local IFS=$'\n' # Treat only newlines as delimiters in string operations.
+	local LC_CTYPE='C' # Do not consider character set in string operations.
 	local cur="${COMP_WORDS[COMP_CWORD]}"
 	COMPREPLY=()
 
+	#local domains="$( defaults domains )"
+	#local candidates=( $( compgen -W "${domains//, /$'\n'}" | grep -i "^${cur}" ) )
 	local domains="$( defaults domains | sed -e 's/, /^/g' | tr '^' '\n' )"
 	local candidates=( $( compgen -W "${domains}" | grep -i "^${cur}" ) )
 	COMPREPLY=( $( printf '%q\n' "${candidates[@]}" ) )
@@ -27,19 +30,19 @@ _defaults_domains()
 }
 
 
-_defaults()
+function _defaults()
 {
 	local IFS=$'\n'
 	local cur prev host_opts cmds cmd domain keys key_index candidates
 	cur="${COMP_WORDS[COMP_CWORD]}"
 	prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-	host_opts='-currentHost -host'
-	cmds='read read-type write rename delete import export domains find help'
+	host_opts=('-currentHost' '-host')
+	cmds='delete domains export find help import read read-type rename write'
 
 	if [[ $COMP_CWORD -eq 1 ]]
 	then
-		candidates=( "${cmds// /$IFS}" "${host_opts// /$IFS}" )
+		candidates=( "${cmds// /$IFS}" "${host_opts[@]}" )
 		COMPREPLY=( $( compgen -W "${candidates[*]}" | grep -i "^${cur}" ) )
 		return 0
 	elif [[ $COMP_CWORD -eq 2 ]]
@@ -140,7 +143,6 @@ _defaults()
 		elif [[ $((key_index+1)) -eq $COMP_CWORD ]]
 		then
 			# Complete value type
-			# Unfortunately ${COMP_WORDS[key_index]} fails on keys with spaces
 			local value_types='-string -data -integer -float -boolean -date -array -array-add -dict -dict-add'
 			local cur_type="$( defaults read-type "$domain" "${COMP_WORDS[key_index]}" 2>/dev/null | sed -e 's/^Type is \(.*\)/-\1/' -e's/dictionary/dict/' | grep "^$cur" )"
 			if [[ $cur_type ]]
