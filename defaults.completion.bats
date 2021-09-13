@@ -2,13 +2,13 @@
 
 load ../test_helper
 
-function local_setup {
+function local_setup() {
   load ../../completion/available/defaults.completion
   function _known_hosts() { :; }
   function defaults() { echo 'NSGlobalDomain, Bash It'; }
 }
 
-function __check_completion () {
+function __check_completion() {
   # Get the parameters as a single value
   COMP_LINE=$*
 
@@ -58,6 +58,11 @@ function __check_completion () {
   assert_line -n 0 'read read-type rename'
 }
 
+@test "completion defaults: -* - show matching flags" {
+  run __check_completion 'defaults -'
+  assert_line -n 0 '-currentHost -host'
+}
+
 @test "completion defaults: -currentHost - show verbs" {
   run __check_completion 'defaults -currentHost '
   assert_line -n 0 'delete domains export find help import read read-type rename write'
@@ -105,5 +110,75 @@ function __check_completion () {
 
 @test "completion defaults: read BASH* - show matching domains (with spaces)" {
   run __check_completion 'defaults read BASH\ I'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -currentHost read - show all domains" {
+  run __check_completion 'defaults -currentHost read '
+  assert_line -n 0 "NSGlobalDomain Bash\ It -app"
+}
+
+@test "completion defaults: -currentHost read nsg* - show matching domains" {
+  run __check_completion 'defaults -currentHost read nsg'
+  assert_line -n 0 "NSGlobalDomain"
+}
+
+@test "completion defaults: -currentHost read NSG* - show matching domains" {
+  run __check_completion 'defaults -currentHost read NSG'
+  assert_line -n 0 "NSGlobalDomain"
+}
+
+@test "completion defaults: -currentHost read bash* - show matching domains" {
+  run __check_completion 'defaults -currentHost read bash'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -currentHost read BASH* - show matching domains" {
+  run __check_completion 'defaults -currentHost read BASH'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -currentHost read bash* - show matching domains (with spaces)" {
+  run __check_completion 'defaults -currentHost read bash\ i'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -currentHost read BASH* - show matching domains (with spaces)" {
+  run __check_completion 'defaults -currentHost read BASH\ I'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -host some.computer.name read - show all domains" {
+  run __check_completion 'defaults -host some.computer.name read '
+  assert_line -n 0 "NSGlobalDomain Bash\ It -app"
+}
+
+@test "completion defaults: -host some.computer.name read nsg* - show matching domains" {
+  run __check_completion 'defaults -host some.computer.name read nsg'
+  assert_line -n 0 "NSGlobalDomain"
+}
+
+@test "completion defaults: -host some.computer.name read NSG* - show matching domains" {
+  run __check_completion 'defaults -host some.computer.name read NSG'
+  assert_line -n 0 "NSGlobalDomain"
+}
+
+@test "completion defaults: -host some.computer.name read bash* - show matching domains" {
+  run __check_completion 'defaults -host some.computer.name read bash'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -host some.computer.name read BASH* - show matching domains" {
+  run __check_completion 'defaults -host some.computer.name read BASH'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -host some.computer.name read bash* - show matching domains (with spaces)" {
+  run __check_completion 'defaults -host some.computer.name read bash\ i'
+  assert_line -n 0 "Bash\ It"
+}
+
+@test "completion defaults: -host some.computer.name read BASH* - show matching domains (with spaces)" {
+  run __check_completion 'defaults -host some.computer.name read BASH\ I'
   assert_line -n 0 "Bash\ It"
 }
